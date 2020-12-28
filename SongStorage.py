@@ -1,6 +1,7 @@
 import mysql.connector
 import os
 import sys
+import re
 from os.path import basename
 from varname import nameof
 from zipfile import ZipFile
@@ -8,17 +9,13 @@ from shutil import copy
 
 os.add_dll_directory(r'C:\Program Files\VideoLAN\VLC')
 import vlc
-import re
-
-
-# conectarea la baza de date
 
 
 class SongStorage:
-    path_re = re.compile("[C-F]{1}(:/){1}([a-z|A-Z|0-9]|/| |-|!|\(|\))+(.mp3|.wav)")
-    path_zip = re.compile("[C-F]{1}(:/){1}([a-z|A-Z|0-9]|/| |-|!|\(|\))+(.zip)")
+    path_re = re.compile("[C-F](:/)([a-z|A-Z|0-9]|/| |-|!|\(|\))+(.mp3|.wav)")
+    path_zip = re.compile("[C-F](:/)([a-z|A-Z|0-9]|/| |-|!|\(|\))+(.zip)")
     path_storage_re = re.compile(
-        "[C-F]{1}(:/){1}([a-z|A-Z|0-9]|/| |-|!|\(|\))+(Storage)([a-z|A-Z|0-9]|/| |-|!|\(|\))+(.mp3|.wav)")
+        "[C-F](:/)([a-z|A-Z|0-9]|/| |-|!|\(|\))+(Storage)([a-z|A-Z|0-9]|/| |-|!|\(|\))+(.mp3|.wav)")
     cnx = None
     isPlaying = False
     playSong = []
@@ -26,6 +23,7 @@ class SongStorage:
     mycursor = None
 
     def __init__(self):
+        # conectarea la baza de date
         self.cnx = mysql.connector.connect(user='root', password='',
                                            host='127.0.0.1',
                                            database='songstorage')
@@ -46,45 +44,46 @@ class SongStorage:
     # asteptarea unei comenzi
     def startTool(self):
         while True:
-            com = input("Give a command. Type H for help...:\t ")
-            if com == 'H' or com == 'h':
+            com = string.lower(input("Give a command. Type H for help...:\t "))
+            if com == 'h':
                 print('Available commands: H, Exit, Play, Stop, Pause, Add_song, Delete_song, Modify_data, '
                       'Create_save_list, Search')
-            elif com == 'Exit':
+            elif com == 'exit':
                 if self.isPlaying:
                     self.isPlaying = False
                     self.playSong[0].stop()
                     self.playSong.clear()
                 print("Exiting...")
                 break
-            elif com == 'Play':
+            elif com == 'play':
                 if not self.isPlaying:
                     self.play_song()
                 else:
-                    stop = input("There is a song paused. Do you want to stop it and play another song? [Y/N]")
+                    stop = string.lower(
+                        input("There is a song paused. Do you want to stop it and play another song? [Y/N]"))
                     while True:
-                        if stop == 'N':
+                        if stop == 'n':
                             print("The song current song will be resumed...")
                             self.playSong[0].play()
                             break
-                        elif stop == 'Y':
+                        elif stop == 'y':
                             self.stop_song()
                             break
                         else:
                             print("Unknown command. Please answer with Y or N...")
-            elif com == 'Stop':
+            elif com == 'stop':
                 self.stop_song()
-            elif com == 'Pause':
+            elif com == 'pause':
                 self.pause_song()
-            elif com == 'Add_song':
+            elif com == 'add_song':
                 print(self.add_song())
-            elif com == 'Delete_song':
+            elif com == 'delete_song':
                 self.delete_song()
-            elif com == 'Modify_data':
+            elif com == 'modify_data':
                 self.modify_data()
-            elif com == "Create_save_list":
+            elif com == "create_save_list":
                 self.create_save_list()
-            elif com == "Search":
+            elif com == "search":
                 self.search()
             else:
                 print("Unknown command. Try again...")
@@ -250,25 +249,25 @@ class SongStorage:
             else:
                 print("Unknown answer. Please respond with Y or N")
         where = ""
-        criterias = tuple()
+        criteria = tuple()
         if artist[0] == 'Y':
             where += nameof(artist) + " = %s AND "
-            criterias += (artist[1],)
+            criteria += (artist[1],)
         if data[0] == 'Y':
             where += nameof(data) + " = %s AND "
-            criterias += (data[1],)
+            criteria += (data[1],)
         if tag[0] == 'Y':
             where += nameof(tag) + " LIKE %s AND "
-            criterias += ("%" + tag[1] + "%",)
+            criteria += ("%" + tag[1] + "%",)
         if format[0] == 'Y':
             where += nameof(artist) + " = %s AND "
-            criterias += (format[1],)
-        return criterias, where
+            criteria += (format[1],)
+        return criteria, where
 
     def create_save_list(self):
-        criterias, where = self.select()
+        criteria, where = self.select()
         sql = "SELECT file_title, format FROM songs WHERE " + where[0:len(where) - 4]
-        self.mycursor.execute(sql, criterias)
+        self.mycursor.execute(sql, criteria)
         result = self.mycursor.fetchall()
         if len(result) == 0:
             print("No songs match your criteria")
@@ -287,16 +286,16 @@ class SongStorage:
                 print("Give valid path")
 
     def search(self):
-        criterias, where = self.select()
+        criteria, where = self.select()
         sql = "SELECT * FROM songs WHERE " + where[0:len(where) - 4]
-        self.mycursor.execute(sql, criterias)
+        self.mycursor.execute(sql, criteria)
         result = self.mycursor.fetchall()
         if len(result) == 0:
             print("No songs match your criteria")
             return
         contor = 1
         for mel in result:
-            print("------------",contor,"------------")
+            print("------------", contor, "------------")
             for field, name in zip(mel, self.mycursor.column_names):
                 print(name, ":", field)
             contor += 1
@@ -304,5 +303,3 @@ class SongStorage:
 
 tool = SongStorage()
 tool.startTool()
-
-# TODO: configure the table, if there is an error, don't add the song, check if melody is already in playlist
